@@ -55,8 +55,7 @@ router.get('/getUsers', async (req, res) => {
 });
 
 router.post('/create', async (req, res) => {
-
-  const { email, password } = req.body
+  const { email, password } = req.body;
   const emailId = await User.findOne({ email: email });
 
   if (emailId) {
@@ -64,16 +63,17 @@ router.post('/create', async (req, res) => {
   } else {
     if (email && password) {
       let encryptedPassword = await bcrypt.hash(req.body.password, 10);
-      const user = User.create({
-        email,
-        password
+      const user = await User.create({
+        email:email,
+        password: encryptedPassword
       });
       return res.status(200).send(req.body);
     } else {
       res.status(400).json({ "message": "Please insert email and password!!", "status": false });
     }
   }
-})
+});
+
 
 router.put('/updateHistory/:id', async (req, res) => {
   try {
