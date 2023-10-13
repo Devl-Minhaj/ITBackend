@@ -14,6 +14,104 @@ const config = process.env;
 router.get('/', (req, res, next) => {
   return res.status(200).json({ message: 'success' });
 });
+
+router.get('/getAsset/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const asset = await Asset.findById(id);
+    if (asset) {
+      res.status(200).json(asset);
+    } else {
+      res.status(404).json({ error: 'Asset not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/updateAsset/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updatedAsset = req.body;
+
+    // If you want to update only the fields that are provided in the request body
+    const result = await Asset.findByIdAndUpdate(id, { $set: updatedAsset }, { new: true });
+
+    if (result) {
+      res.status(200).json({ message: 'Asset updated successfully' });
+    } else {
+      res.status(404).json({ error: 'Asset not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/updateUser/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { email, password, role } = req.body;
+
+    // If the password field is empty, don't update the password
+    const updatedUser = {
+      email,
+      role
+    };
+
+    if (password) {
+      // If a new password is provided, hash it and add it to the update object
+      updatedUser.password = await bcrypt.hash(password, 10);
+    }
+
+    const result = await User.findByIdAndUpdate(id, updatedUser);
+
+    if (result) {
+      // The update was successful
+      return res.status(200).json({ message: 'User updated successfully' });
+    } else {
+      // No document was found with the provided ID
+      return res.status(404).json({ error: 'User not found' });
+    }
+  } catch (error) {
+    // Handle other errors
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/getUsers', async (req, res) => {
+  try {
+    const users = await User.find({}, 'name email role'); // Fetch all user names and other details
+
+    // Respond with the user details as JSON
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Failed to fetch user options' });
+  }
+});
+router.delete('/deleteuser/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const result = await NewUser.findByIdAndRemove(id);
+
+    if (result) {
+      // The user was successfully deleted
+      return res.status(200).json({ message: 'User deleted successfully' });
+    } else {
+      // No document was found with the provided ID
+      return res.status(404).json({ error: 'User not found' });
+    }
+  } catch (error) {
+    // Handle other errors
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // API route to Add a user
 router.post('/addUser', (req, res) => {
   try {
@@ -39,7 +137,7 @@ router.post('/addUser', (req, res) => {
 });
 
 // Define a route to fetch user options
-router.get('/getUsers', async (req, res) => {
+router.get('/get_Users', async (req, res) => {
   try {
     const users = await NewUser.find({}, 'name'); // Fetch all user names
 
@@ -55,24 +153,27 @@ router.get('/getUsers', async (req, res) => {
 });
 
 router.post('/create', async (req, res) => {
-  const { email, password } = req.body;
+  const { name, email, password, role } = req.body;
   const emailId = await User.findOne({ email: email });
 
   if (emailId) {
     res.status(400).json({ "message": "Email already exists.!!", "status": false });
   } else {
-    if (email && password) {
+    if (name && email && password && role) { // Check for role too
       let encryptedPassword = await bcrypt.hash(req.body.password, 10);
       const user = await User.create({
-        email:email,
-        password: encryptedPassword
+        name:name,
+        email: email,
+        password: encryptedPassword,
+        role: role // Use the role from the request
       });
       return res.status(200).send(req.body);
     } else {
-      res.status(400).json({ "message": "Please insert email and password!!", "status": false });
+      res.status(400).json({ "message": "Please insert email, password, and role!!", "status": false });
     }
   }
 });
+
 
 
 router.put('/updateHistory/:id', async (req, res) => {
@@ -191,6 +292,7 @@ router.get('/getsystemuser/:id', async (req, res) => {
 
 
 // Login Route
+// Login Route
 router.post('/login', async (req, res, next) => {
   // const user =await User.findOne({email:req.body.email});
 
@@ -221,6 +323,7 @@ router.post('/login', async (req, res, next) => {
         token: token,
         user_id: user._id,
         email: email,
+        role: user.role
       };
       return res.status(200).json({ "data": authuser, "status": true });
 
@@ -229,9 +332,9 @@ router.post('/login', async (req, res, next) => {
     }
   } catch (err) {
     res.status(400).json({ "message": err, "status": false });
+
   }
 });
-
 // Logout Route (if needed)
 router.get('/logout', (req, res) => {
   req.logout();
