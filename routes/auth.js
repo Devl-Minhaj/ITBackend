@@ -1,10 +1,8 @@
 // backend/routes/auth.js
 const express = require('express');
-const passport = require('passport');
 const router = express.Router();
 const User = require('../models/User');
 const Asset = require('../models/Asset')
-const CircularJSON = require('circular-json');
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const NewUser = require('../models/NewUser');
@@ -33,11 +31,8 @@ router.get('/getAsset/:id', async (req, res) => {
 router.put('/updateAsset/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const updatedAsset = req.body;
-
-    // If you want to update only the fields that are provided in the request body
+    const updatedAsset = req.body;    
     const result = await Asset.findByIdAndUpdate(id, { $set: updatedAsset }, { new: true });
-
     if (result) {
       res.status(200).json({ message: 'Asset updated successfully' });
     } else {
@@ -52,30 +47,21 @@ router.put('/updateAsset/:id', async (req, res) => {
 router.put('/updateUser/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const { email, password, role } = req.body;
-
-    // If the password field is empty, don't update the password
+    const { email, password, role } = req.body;    
     const updatedUser = {
       email,
       role
     };
-
-    if (password) {
-      // If a new password is provided, hash it and add it to the update object
+    if (password) {      
       updatedUser.password = await bcrypt.hash(password, 10);
     }
-
     const result = await User.findByIdAndUpdate(id, updatedUser);
-
-    if (result) {
-      // The update was successful
+    if (result) {      
       return res.status(200).json({ message: 'User updated successfully' });
-    } else {
-      // No document was found with the provided ID
+    } else {      
       return res.status(404).json({ error: 'User not found' });
     }
-  } catch (error) {
-    // Handle other errors
+  } catch (error) {   
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
@@ -83,9 +69,7 @@ router.put('/updateUser/:id', async (req, res) => {
 
 router.get('/getUsers', async (req, res) => {
   try {
-    const users = await User.find({}, 'name email role'); // Fetch all user names and other details
-
-    // Respond with the user details as JSON
+    const users = await User.find({}, 'name email role'); 
     res.status(200).json(users);
   } catch (error) {
     console.error('Error:', error);
@@ -95,40 +79,40 @@ router.get('/getUsers', async (req, res) => {
 router.delete('/deleteuser/:id', async (req, res) => {
   try {
     const id = req.params.id;
+    console.log('Received _id:', id); // Add this line to log the received _id
 
-    const result = await NewUser.findByIdAndRemove(id);
+    // Add this block to check if a user with the received _id exists
+    const userExists = await User.findById(id);
+    if (!userExists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
+    const result = await User.findByIdAndRemove(id);
     if (result) {
-      // The user was successfully deleted
       return res.status(200).json({ message: 'User deleted successfully' });
     } else {
-      // No document was found with the provided ID
       return res.status(404).json({ error: 'User not found' });
     }
   } catch (error) {
-    // Handle other errors
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
+
 // API route to Add a user
 router.post('/addUser', (req, res) => {
   try {
-    const { userName, email, phoneNumber } = req.body;
-
-    // Validate user input (e.g., check for required fields)
-
-    // Create a new user object using the user schema
+    const { userName, email, phoneNumber ,Designation} = req.body;   
     const newUser = {
       name: userName,
       email,
       phoneNumber,
+      Designation,
     };
 
     // Push the new user object into the 'users' array
     NewUser.create(newUser);
-
     res.status(201).json({ message: 'User added successfully' });
   } catch (error) {
     console.error('Error:', error);
@@ -136,36 +120,46 @@ router.post('/addUser', (req, res) => {
   }
 });
 
-// Define a route to fetch user options
+//  Route to fetch user options
+// router.get('/get_Users', async (req, res) => {
+//   try {
+//     const users = await NewUser.find({}, 'name'); 
+//     const userNames = users.map((user) => user.name);
+//     res.status(200).json({ users: userNames });
+//   } catch (error) {
+//     console.error('Error:', error);
+//     res.status(500).json({ error: 'Failed to fetch user options' });
+//   }
+// });
 router.get('/get_Users', async (req, res) => {
   try {
-    const users = await NewUser.find({}, 'name'); // Fetch all user names
-
-    // Extract only the user names and create an array
-    const userNames = users.map((user) => user.name);
-
-    // Respond with the user names as JSON
-    res.status(200).json({ users: userNames });
+    const users = await NewUser.find({}, 'name Designation');
+    console.log(users);
+    const userOptions = users.map((user) => ({ label: user.name, value: user.name, designation: user.Designation }));
+    res.status(200).json({ users: userOptions });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: 'Failed to fetch user options' });
   }
 });
 
+
+
+
+
 router.post('/create', async (req, res) => {
   const { name, email, password, role } = req.body;
   const emailId = await User.findOne({ email: email });
-
   if (emailId) {
     res.status(400).json({ "message": "Email already exists.!!", "status": false });
   } else {
-    if (name && email && password && role) { // Check for role too
+    if (name && email && password && role) { 
       let encryptedPassword = await bcrypt.hash(req.body.password, 10);
       const user = await User.create({
         name:name,
         email: email,
         password: encryptedPassword,
-        role: role // Use the role from the request
+        role: role
       });
       return res.status(200).send(req.body);
     } else {
@@ -173,8 +167,6 @@ router.post('/create', async (req, res) => {
     }
   }
 });
-
-
 
 router.put('/updateHistory/:id', async (req, res) => {
   try {
@@ -197,17 +189,12 @@ router.put('/updateHistory/:id', async (req, res) => {
         arrayFilters: [{ 'elem.UserName': req.body.oldUserName, 'elem.startDate': req.body.oldStartDate, 'elem.endDate': req.body.oldEndDate }],
       }
     );
-
-
-    if (result) {
-      // The update was successful
+    if (result) {     
       return res.status(200).json({ message: 'History record updated successfully' });
-    } else {
-      // No document was modified because it doesn't exist
+    } else {      
       return res.status(404).json({ error: 'Document not found' });
     }
-  } catch (error) {
-    // Handle other errors
+  } catch (error) {    
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
@@ -215,46 +202,37 @@ router.put('/updateHistory/:id', async (req, res) => {
 
 router.post('/saveHistory/:id', async (req, res) => {
   try {
-    const { UserName, startDate, endDate } = req.body;
+    const { UserName, startDate, endDate,designation  } = req.body;
     const id = req.params.id;
     const data = {
       UserName,
       startDate,
       endDate,
+      designation ,
       created_at: new Date(),
     }
-
     const result = await Asset.updateOne({ _id: id }, { $push: { empHistory: data } });
-
-    if (result.modifiedCount === 1) {
-      // The update was successful
+    if (result.modifiedCount === 1) {      
       return res.status(201).json({ data: data });
-    } else if (result.n === 0) {
-      // No document was modified because it doesn't exist
+    } else if (result.n === 0) {      
       return res.status(404).json({ error: 'Document not found' });
-    } else {
-      // Handle unexpected situations where more than one document is modified
+    } else {      
       return res.status(500).json({ error: 'Internal server error' });
     }
-  } catch (error) {
-    // Handle other errors
+  } catch (error) {   
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-/// Save Asset
+// Save Asset
 router.post('/saveAsset', async (req, res) => {
   try {
     const assetData = req.body;
-
     console.log(req.body)
-
     const { SerialNumber, RAM, HDD, Processor, OS, Office, LanNo, AssetType } = assetData;
-
     if (SerialNumber && RAM && HDD && Processor && OS && Office && LanNo && AssetType) {
       const asset = await Asset.create(assetData);
-
       if (asset) {
         res.status(201).json({ message: 'Asset saved successfully', status: 201 });
       } else {
@@ -263,7 +241,6 @@ router.post('/saveAsset', async (req, res) => {
     } else {
       res.status(400).json({ message: 'Fields has not been filled ', status: 400 });
     }
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error', status: 500 });
@@ -290,26 +267,13 @@ router.get('/getsystemuser/:id', async (req, res) => {
   }
 });
 
-
-// Login Route
-// Login Route
 router.post('/login', async (req, res, next) => {
-  // const user =await User.findOne({email:req.body.email});
-
-  try {
-    // Get user input
-
-    //return res.status(200).send('ji');
-    const { email, password } = req.body;
-
-    // Validate user input
-    if (!(email && password)) {
-      //res.status(400).send("All input is required");
+    try {
+    const { email, password } = req.body;    
+    if (!(email && password)) {     
       return res.status(400).json({ "message": "All input is required", "status": false });
     }
-    // Validate if user exist in our database
     const user = await User.findOne({ email });
-
     if (user && (await bcrypt.compare(password, user.password))) {
       // Create token        
       const token = jwt.sign(
